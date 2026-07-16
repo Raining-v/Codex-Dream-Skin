@@ -6,7 +6,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$node = (Get-Command node -ErrorAction Stop).Source
+. (Join-Path $PSScriptRoot 'common-windows.ps1')
+$node = (Resolve-NodeRuntime).Path
 $injector = Join-Path $PSScriptRoot 'injector.mjs'
 $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
 $StatePath = Join-Path $StateRoot 'state.json'
@@ -14,8 +15,11 @@ $StatePath = Join-Path $StateRoot 'state.json'
 if (Test-Path -LiteralPath $StatePath) {
   try {
     $state = Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json
-    if ($state.injectorPid) { Stop-Process -Id ([int]$state.injectorPid) -Force -ErrorAction SilentlyContinue }
+    if ($state.port) { $Port = [int]$state.port }
   } catch {}
+  if (-not (Stop-RecordedInjectorSafely $StatePath)) {
+    throw "Refusing to stop the recorded injector because its live process identity does not match $StatePath."
+  }
   Remove-Item -LiteralPath $StatePath -Force -ErrorAction SilentlyContinue
 }
 Start-Sleep -Milliseconds 250
@@ -55,6 +59,7 @@ if ($RestoreBaseTheme) {
     }
   }
   Set-Content -LiteralPath $config -Value $currentContent -Encoding utf8
+  Remove-Item -LiteralPath $backup -Force
 }
 
 Write-Host 'The live Dream Skin was removed.'

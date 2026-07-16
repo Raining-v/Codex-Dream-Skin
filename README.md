@@ -101,6 +101,8 @@
 | Apple Silicon / Intel Mac | [`macos/`](./macos/) | 双击 `Install Codex Dream Skin.command` |
 | Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `start-dream-skin.ps1` |
 
+Windows 需先安装并打开一次官方 Microsoft Store Codex，并确保 PowerShell 中可用 Node.js 20 或更高版本；macOS 不需要另装 Node.js。
+
 更细的说明：
 
 - Mac：[`macos/README.md`](./macos/README.md)
@@ -111,7 +113,7 @@
 ## 反馈与贡献
 
 - **Issue：** 请用 [Issue 模板](./.github/ISSUE_TEMPLATE/)（Bug / 功能）；已关闭空白 Issue。提交前建议先跑 Verify / Restore 自检。
-- **PR：** 请按 [PR 模板](./.github/pull_request_template.md) 写清改动，并勾选对应自测（如 `macos/tests/run-tests.sh`、verify / restore）。
+- **PR：** 请按 [PR 模板](./.github/pull_request_template.md) 写清改动，并勾选对应自测（如 `macos/tests/run-tests.sh`、`windows/tests/run-tests.ps1`、verify / restore）。
 
 ## 安全边界
 

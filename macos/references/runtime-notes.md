@@ -3,7 +3,7 @@
 - Discover the official `com.openai.codex` bundle on every launch; do not assume an upgrade keeps the same executable internals.
 - Use `Contents/Resources/cua_node/bin/node` from that bundle. Require Node.js 20+, a valid strict code signature, matching architecture, and OpenAI Team ID `2DC432GLL2` on both app and runtime.
 - Do not ship a Node binary and do not depend on a globally installed `node` or `npm`.
-- Launch the official executable through a per-user `launchd` job with `--remote-debugging-address=127.0.0.1` and a selected port. LaunchServices may discard Chromium flags.
+- Launch the official executable as a normal user process with `--remote-debugging-address=127.0.0.1` and a selected port. Remove legacy per-user `launchd` jobs from older builds so closing Codex does not relaunch it unexpectedly.
 - Prefer port `9341`; scan through `9441` on collision and record the selected port in state.
 - Accept CDP only when the listener belongs to the discovered Codex main process or one of its legitimate descendants, the WebSocket URL is loopback-only, and an `app://` renderer exposes expected native shell markers.
 - Treat loopback CDP as locally privileged but unauthenticated. Keep the themed session limited to trusted local use and close the port through a full Restore when finished.

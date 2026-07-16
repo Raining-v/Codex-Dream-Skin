@@ -25,6 +25,8 @@
 
 ### Windows
 
+前置条件：官方 Microsoft Store Codex 已安装并至少打开一次；PowerShell 中可使用 Node.js 20 或更高版本。
+
 | 用途 | 路径 |
 |------|------|
 | 源码（本整理包） | `Codex-Dream-Skin/windows/` |
@@ -41,7 +43,7 @@
 | 一键恢复 | ✅ | ✅ |
 | 实机 verify / 截图 | ✅ | ✅ |
 | 用户选图定制 | ✅ | ❌ |
-| 官方签名校验 | ✅ | 部分（Store 包发现） |
+| 官方身份校验 | ✅（签名 / Team ID） | ✅（Store 包路径 / publisher ID / 产品元数据） |
 | 客户部署提示词 | ✅ | ❌（可用 Mac 文案改写） |
 | 打客户 ZIP | ✅ `build-client-release.sh` | 手动压缩 `windows/` |
 

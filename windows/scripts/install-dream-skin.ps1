@@ -5,7 +5,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'common-windows.ps1')
 $SkillRoot = Split-Path -Parent $PSScriptRoot
+$codexRuntime = Resolve-CodexRuntime
+$nodeRuntime = Resolve-NodeRuntime
 $StateRoot = Join-Path $env:LOCALAPPDATA 'CodexDreamSkin'
 New-Item -ItemType Directory -Force -Path $StateRoot | Out-Null
 $ConfigPath = Join-Path $HOME '.codex\config.toml'
@@ -56,4 +59,5 @@ if (-not $NoShortcuts) {
   $restore.Save()
 }
 
-Write-Host 'Codex Dream Skin installed. Launch it with the created shortcut or start-dream-skin.ps1.'
+Write-Host "Codex Dream Skin $DreamSkinVersion installed for Codex $($codexRuntime.ProductVersion) using Node.js $($nodeRuntime.Version)."
+Write-Host 'Launch it with the created shortcut or start-dream-skin.ps1.'

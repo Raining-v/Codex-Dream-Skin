@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
+const SKIN_VERSION = "1.0.1";
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 
 function parseArgs(argv) {
   const options = { port: 9335, mode: "watch", timeoutMs: 30000, screenshot: null, reload: false };
@@ -17,6 +19,7 @@ function parseArgs(argv) {
     else if (arg === "--timeout-ms") options.timeoutMs = Number(argv[++i]);
     else if (arg === "--screenshot") options.screenshot = path.resolve(argv[++i]);
     else if (arg === "--reload") options.reload = true;
+    else if (arg === "--check-payload") options.mode = "check";
     else throw new Error(`Unknown argument: ${arg}`);
   }
   if (!Number.isInteger(options.port) || options.port < 1024 || options.port > 65535) {
@@ -25,10 +28,20 @@ function parseArgs(argv) {
   return options;
 }
 
+function validatedDebuggerUrl(target, port) {
+  const raw = target?.webSocketDebuggerUrl;
+  if (typeof raw !== "string" || !raw) throw new Error("Target has no debugger WebSocket URL");
+  const url = new URL(raw);
+  if (url.protocol !== "ws:") throw new Error(`Debugger URL must use ws: ${raw}`);
+  if (!LOOPBACK_HOSTS.has(url.hostname)) throw new Error(`Debugger URL is not loopback-only: ${raw}`);
+  if (Number(url.port) !== port) throw new Error(`Debugger URL port does not match ${port}: ${raw}`);
+  return raw;
+}
+
 class CdpSession {
-  constructor(target) {
+  constructor(target, port) {
     this.target = target;
-    this.ws = new WebSocket(target.webSocketDebuggerUrl);
+    this.ws = new WebSocket(validatedDebuggerUrl(target, port));
     this.nextId = 1;
     this.pending = new Map();
     this.listeners = new Map();
@@ -107,7 +120,15 @@ async function waitForTargets(port, timeoutMs) {
       const response = await fetch(`http://127.0.0.1:${port}/json/list`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const targets = await response.json();
-      const pages = targets.filter((item) => item.type === "page" && item.url.startsWith("app://"));
+      const pages = targets.filter((item) => {
+        if (item.type !== "page" || !item.url?.startsWith("app://")) return false;
+        try {
+          validatedDebuggerUrl(item, port);
+          return true;
+        } catch {
+          return false;
+        }
+      });
       if (pages.length) return pages;
     } catch (error) {
       lastError = error;
@@ -129,8 +150,18 @@ async function loadPayload() {
     .replace("__DREAM_ART_JSON__", JSON.stringify(artDataUrl));
 }
 
-async function connectTarget(target) {
-  return new CdpSession(target).open();
+async function connectTarget(target, port) {
+  return new CdpSession(target, port).open();
+}
+
+async function probeSession(session) {
+  return session.evaluate(`(() => {
+    const shell = Boolean(document.querySelector('main.main-surface'));
+    const sidebar = Boolean(document.querySelector('aside.app-shell-left-panel'));
+    const composer = Boolean(document.querySelector('.composer-surface-chrome'));
+    const main = Boolean(document.querySelector('[role="main"]'));
+    return { shell, sidebar, composer, main, codex: shell && sidebar && (composer || main) };
+  })()`);
 }
 
 async function applyToSession(session, payload) {
@@ -222,8 +253,10 @@ async function runOneShot(options) {
   const payload = (options.mode === "once" || options.reload) ? await loadPayload() : null;
   const results = [];
   for (const target of targets) {
-    const session = await connectTarget(target);
+    const session = await connectTarget(target, options.port);
     try {
+      const probe = await probeSession(session);
+      if (!probe?.codex) continue;
       if (options.mode === "remove") await removeFromSession(session);
       else if (options.mode === "once") await applyToSession(session, payload);
       if (options.mode === "once") {
@@ -245,6 +278,7 @@ async function runOneShot(options) {
       session.close();
     }
   }
+  if (!results.length) throw new Error(`No verified native Codex renderer on 127.0.0.1:${options.port}`);
   console.log(JSON.stringify({ mode: options.mode, port: options.port, targets: results }, null, 2));
   if (options.mode === "verify" && results.some((item) => !item.result.pass)) process.exitCode = 2;
 }
@@ -277,8 +311,14 @@ async function runWatch(options) {
 
     for (const target of targets) {
       if (sessions.has(target.id)) continue;
+      let session;
       try {
-        const session = await connectTarget(target);
+        session = await connectTarget(target, options.port);
+        const probe = await probeSession(session);
+        if (!probe?.codex) {
+          session.close();
+          continue;
+        }
         session.on("Page.loadEventFired", () => {
           setTimeout(() => applyToSession(session, payload).catch((error) => {
             console.error(`[dream-skin] reinject failed: ${error.message}`);
@@ -288,6 +328,7 @@ async function runWatch(options) {
         sessions.set(target.id, session);
         console.log(`[dream-skin] injected target ${target.id} (${target.title || target.url})`);
       } catch (error) {
+        session?.close();
         console.error(`[dream-skin] inject failed for ${target.id}: ${error.message}`);
       }
     }
@@ -297,6 +338,30 @@ async function runWatch(options) {
   for (const session of sessions.values()) session.close();
 }
 
-const options = parseArgs(process.argv.slice(2));
-if (options.mode === "watch") await runWatch(options);
-else await runOneShot(options);
+try {
+  const options = parseArgs(process.argv.slice(2));
+  if (options.mode === "check") {
+    const payload = await loadPayload();
+    validatedDebuggerUrl({ webSocketDebuggerUrl: `ws://127.0.0.1:${options.port}/devtools/page/check` }, options.port);
+    let rejectedLan = false;
+    try {
+      validatedDebuggerUrl({ webSocketDebuggerUrl: `ws://192.168.1.10:${options.port}/devtools/page/check` }, options.port);
+    } catch {
+      rejectedLan = true;
+    }
+    if (!rejectedLan) throw new Error("Non-loopback debugger URL self-check failed");
+    console.log(JSON.stringify({
+      pass: true,
+      version: SKIN_VERSION,
+      payloadBytes: Buffer.byteLength(payload),
+      security: {
+        loopbackDebuggerUrls: rejectedLan,
+        nativeRendererProbe: typeof probeSession === "function",
+      },
+    }, null, 2));
+  } else if (options.mode === "watch") await runWatch(options);
+  else await runOneShot(options);
+} catch (error) {
+  console.error(`[dream-skin] ${error.stack || error.message}`);
+  process.exitCode = 1;
+}

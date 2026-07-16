@@ -7,6 +7,11 @@ description: Apply, launch, verify, repair, update, or restore a full decorative
 
 Apply a reversible renderer skin through Chromium DevTools Protocol while launching the official Store-installed Codex executable. Never replace or take ownership of files under `WindowsApps`.
 
+## Requirements
+
+- Windows with the official Microsoft Store Codex app installed and opened once
+- Node.js 20 or newer available as `node` in PowerShell
+
 ## Workflow
 
 1. Run `scripts/install-dream-skin.ps1` once to set the matching official base colors and create launch/restore shortcuts.
@@ -24,6 +29,8 @@ Apply a reversible renderer skin through Chromium DevTools Protocol while launch
 - Keep decorative layers `pointer-events: none` and keep real buttons, navigation, and composer above them.
 - On app updates, rerun install and launch; the scripts discover the current Appx package dynamically.
 - If port `9335` is occupied, choose another port consistently for start, verify, and restore.
+- Bind CDP explicitly to `127.0.0.1`; reject non-loopback debugger WebSocket URLs and renderer targets without native Codex shell markers.
+- Stop a recorded injector only when PID, start time, Node path, injector path, and command line all match.
 - Keep the injection daemon running for navigation/reload resilience. Its state and logs live under `%LOCALAPPDATA%\CodexDreamSkin`.
 
 ## Resources

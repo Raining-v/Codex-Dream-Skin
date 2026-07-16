@@ -102,6 +102,8 @@ Platform scripts are ready — different plumbing, same goal: theme Codex.
 | Apple Silicon / Intel Mac | [`macos/`](./macos/) | Double-click `Install Codex Dream Skin.command` |
 | Windows | [`windows/`](./windows/) | `scripts/install-dream-skin.ps1` → `start-dream-skin.ps1` |
 
+Windows requires the official Microsoft Store Codex app to be installed and opened once, plus Node.js 20 or newer available in PowerShell. macOS does not require a separate Node.js installation.
+
 More detail:
 
 - Mac: [`macos/README.md`](./macos/README.md)
@@ -112,7 +114,7 @@ More detail:
 ## Feedback & contributions
 
 - **Issues:** Use the [issue templates](./.github/ISSUE_TEMPLATE/) (bug / feature). Blank issues are disabled. Please try Verify / Restore self-checks before filing bugs.
-- **PRs:** Follow the [PR template](./.github/pull_request_template.md) — describe the change and tick the self-checks you actually ran (e.g. `macos/tests/run-tests.sh`, verify / restore).
+- **PRs:** Follow the [PR template](./.github/pull_request_template.md) — describe the change and tick the self-checks you actually ran (e.g. `macos/tests/run-tests.sh`, `windows/tests/run-tests.ps1`, verify / restore).
 
 ## Safety
 

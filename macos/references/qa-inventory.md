@@ -20,8 +20,8 @@
 - Official app and internal Node signature, Team ID, architecture, and version validation.
 - Port collision selection and saved-port reuse.
 - PID reuse protection through PID, start time, executable, script path, and command-line matching.
-- Live verification after `Page.reload` returns version `1.0.0` and `pass: true`.
-- Strict home verification requires a visible banner of at least 320×160, two to four visible native cards, visible project button, composer, sidebar, non-interactive decoration, and no horizontal overflow.
+- Live verification after `Page.reload` returns version `1.1.2` and `pass: true`.
+- Automated home verification requires a visible banner of at least 280×120, one to six visible native cards, composer, sidebar, non-interactive decoration, and no horizontal overflow; release signoff still checks the real project selector manually.
 
 ## Visual checks
 

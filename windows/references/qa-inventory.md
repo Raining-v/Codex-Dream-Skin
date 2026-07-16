@@ -18,6 +18,13 @@
 - Reload: use CDP `Page.reload`, wait, and confirm the injection marker returns.
 - Restore/reapply cycle: remove live skin, verify marker absent, apply again, verify marker present.
 - Update resilience: resolve the current `OpenAI.Codex` Appx location dynamically; never store a versioned WindowsApps path.
+- Fallback discovery: when Appx lookup is unavailable, accept only a running official Codex executable with the expected package publisher ID, manifest, and product metadata.
+- CDP safety: require loopback debugger WebSocket URLs and probe native Codex shell/sidebar/composer markers before injection.
+- PID reuse: refuse to stop a recorded injector when start time, Node path, injector path, or command line differs.
+
+## Automated checks
+
+Run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tests/run-tests.ps1` from `windows/`. It validates runtime fallback, Node.js 20+, loopback CDP, injector identity, payload construction, and PowerShell syntax without launching or stopping Codex.
 
 ## Visual checks
 
