@@ -37,12 +37,13 @@ if (-not $debugReady -and -not $ProfilePath -and $mainProcesses.Count -gt 0) {
 }
 
 if (-not (Test-CodexDebugPort $Port)) {
-  $arguments = @('--remote-debugging-address=127.0.0.1', "--remote-debugging-port=$Port")
   if ($ProfilePath) {
     New-Item -ItemType Directory -Force -Path $ProfilePath | Out-Null
-    $arguments += "--user-data-dir=$ProfilePath"
   }
-  Start-Process -FilePath $codexRuntime.Executable -ArgumentList $arguments
+  $arguments = Format-CodexLaunchArguments -Port $Port -ProfilePath $ProfilePath
+  [void](Invoke-CodexApplicationActivation `
+    -ApplicationUserModelId $codexRuntime.ApplicationUserModelId `
+    -Arguments $arguments)
 }
 
 $deadline = (Get-Date).AddSeconds(30)

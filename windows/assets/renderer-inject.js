@@ -98,7 +98,7 @@
   const observer = new MutationObserver(scheduleEnsure);
   observer.observe(document.documentElement, { childList: true, subtree: true });
   const timer = setInterval(ensure, 5000);
-  window[STATE_KEY] = { ensure, cleanup, observer, timer, scheduler, artUrl, version: "1.0.1" };
+  window[STATE_KEY] = { ensure, cleanup, observer, timer, scheduler, artUrl, version: "1.0.2" };
   ensure();
-  return { installed: true, version: "1.0.1" };
+  return { installed: true, version: "1.0.2" };
 })(__DREAM_CSS_JSON__, __DREAM_ART_JSON__)

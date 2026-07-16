@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
-const SKIN_VERSION = "1.0.1";
+const SKIN_VERSION = "1.0.2";
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
 
 function parseArgs(argv) {
@@ -16,6 +16,7 @@ function parseArgs(argv) {
     else if (arg === "--watch") options.mode = "watch";
     else if (arg === "--verify") options.mode = "verify";
     else if (arg === "--remove") options.mode = "remove";
+    else if (arg === "--probe") options.mode = "probe";
     else if (arg === "--timeout-ms") options.timeoutMs = Number(argv[++i]);
     else if (arg === "--screenshot") options.screenshot = path.resolve(argv[++i]);
     else if (arg === "--reload") options.reload = true;
@@ -156,11 +157,34 @@ async function connectTarget(target, port) {
 
 async function probeSession(session) {
   return session.evaluate(`(() => {
+    const describe = (node) => node ? {
+      tag: node.tagName,
+      id: node.id || null,
+      className: typeof node.className === 'string' ? node.className.slice(0, 240) : null,
+      role: node.getAttribute?.('role') || null,
+      hasAriaLabel: Boolean(node.getAttribute?.('aria-label')),
+      testId: node.getAttribute?.('data-testid') || null,
+      feature: node.getAttribute?.('data-feature') || null,
+    } : null;
     const shell = Boolean(document.querySelector('main.main-surface'));
     const sidebar = Boolean(document.querySelector('aside.app-shell-left-panel'));
     const composer = Boolean(document.querySelector('.composer-surface-chrome'));
     const main = Boolean(document.querySelector('[role="main"]'));
-    return { shell, sidebar, composer, main, codex: shell && sidebar && (composer || main) };
+    return {
+      title: document.title,
+      href: location.href,
+      readyState: document.readyState,
+      body: describe(document.body),
+      shell,
+      sidebar,
+      composer,
+      main,
+      codex: shell && sidebar && (composer || main),
+      landmarks: [...document.querySelectorAll('main, aside, [role="main"], [role="navigation"], textarea, form')]
+        .slice(0, 30).map(describe),
+      signals: [...document.querySelectorAll('button, input, textarea, [data-testid], [data-feature], [role]')]
+        .slice(0, 80).map(describe),
+    };
   })()`);
 }
 
@@ -256,6 +280,10 @@ async function runOneShot(options) {
     const session = await connectTarget(target, options.port);
     try {
       const probe = await probeSession(session);
+      if (options.mode === "probe") {
+        results.push({ targetId: target.id, title: target.title, url: target.url, result: probe });
+        continue;
+      }
       if (!probe?.codex) continue;
       if (options.mode === "remove") await removeFromSession(session);
       else if (options.mode === "once") await applyToSession(session, payload);

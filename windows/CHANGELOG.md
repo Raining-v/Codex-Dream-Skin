@@ -1,5 +1,24 @@
 # Windows Changelog
 
+## 1.0.2 — 2026-07-16
+
+### 修复
+
+- 使用 Windows 应用激活 API 启动 Microsoft Store 版 Codex，避免直接执行受保护的 WindowsApps 程序时出现“拒绝访问”
+- 配置文件始终按严格 UTF-8 读写，中文用户名或路径不再因 Windows PowerShell 5.1 的默认编码而损坏
+- 已存在 `[desktop.appearanceLightChromeTheme]` 嵌套主题时原位更新字段，不再额外写入同名内联表导致 TOML 重复键
+- 恢复基础主题时同步还原嵌套颜色、字体与语义色字段，不再残留 Dream Skin 外观设置
+- 兼容带缩进键、表头尾注释和预览路径尾随反斜杠的合法 Windows 配置
+
+### 改进
+
+- 增加 `--probe` 诊断模式，仅输出结构标记，不记录项目名、任务文字或无障碍标签内容
+- Windows 测试新增商店应用标识、带空格启动参数、无 BOM 中文 UTF-8 配置和嵌套主题幂等写入覆盖
+
+### 说明
+
+- 继续仅通过回环 CDP 外部注入，不修改 WindowsApps、`app.asar`、应用签名或模型/API 配置
+
 ## 1.0.1 — 2026-07-16
 
 ### 修复

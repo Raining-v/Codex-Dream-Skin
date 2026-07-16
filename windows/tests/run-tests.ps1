@@ -23,6 +23,75 @@ function Assert-Equal($Expected, $Actual, [string]$Message) {
 Assert-True (Test-Path -LiteralPath $Common) 'shared Windows runtime module exists'
 . $Common
 
+$utf8Fixture = Join-Path ([System.IO.Path]::GetTempPath()) "dream-skin-utf8-$PID.toml"
+try {
+  $utf8Config = 'notify = [ "C:\\Users\\刘云飞\\AppData\\Local\\OpenAI\\Codex.exe", "turn-ended" ]' + "`n`n[desktop]`n"
+  [System.IO.File]::WriteAllText($utf8Fixture, $utf8Config, (New-Object System.Text.UTF8Encoding($false)))
+  $utf8Content = Read-Utf8TextFile -LiteralPath $utf8Fixture
+  Assert-Equal $utf8Config $utf8Content 'BOM-less UTF-8 config with a Chinese user path is decoded without corruption'
+  Write-Utf8TextFile -LiteralPath $utf8Fixture -Value ($utf8Content + 'appearanceTheme = "light"' + "`n")
+  $utf8RoundTrip = [System.IO.File]::ReadAllText($utf8Fixture, (New-Object System.Text.UTF8Encoding($false, $true)))
+  Assert-True ($utf8RoundTrip.Contains('C:\\Users\\刘云飞\\AppData')) 'UTF-8 config round trip preserves Chinese text and escaped path separators'
+} finally {
+  Remove-Item -LiteralPath $utf8Fixture -Force -ErrorAction SilentlyContinue
+}
+
+$nestedThemeConfig = @'
+[desktop]
+appearanceTheme = "system"
+appearanceLightCodeThemeId = "codex"
+
+[desktop.appearanceLightChromeTheme]
+accent = "#0169cc"
+contrast = 45
+ink = "#0d0d0d"
+opaqueWindows = false
+surface = "#ffffff"
+'@
+$nestedThemeResult = Set-DreamSkinDesktopConfig -Content $nestedThemeConfig
+Assert-Equal 0 ([regex]::Matches($nestedThemeResult, '(?m)^appearanceLightChromeTheme\s*=')).Count `
+  'an existing nested light theme is not duplicated by an inline table'
+Assert-True ($nestedThemeResult.Contains('appearanceTheme = "light"')) 'Dream Skin selects the light shell'
+Assert-True ($nestedThemeResult.Contains('accent = "#B65CFF"')) 'nested light theme accent is updated'
+Assert-True ($nestedThemeResult.Contains('code = "Cascadia Code"')) 'nested light theme code font is added'
+Assert-True ($nestedThemeResult.Contains('ui = "Microsoft YaHei UI"')) 'nested light theme UI font is added'
+$restoredNestedTheme = Restore-DreamSkinDesktopConfig -CurrentContent $nestedThemeResult -BackupContent $nestedThemeConfig
+Assert-True ($restoredNestedTheme.Contains('appearanceTheme = "system"')) 'restore returns the original shell selection'
+Assert-True ($restoredNestedTheme.Contains('accent = "#0169cc"')) 'restore returns the original nested accent'
+Assert-False ($restoredNestedTheme.Contains('code = "Cascadia Code"')) 'restore removes a nested font absent from the backup'
+Assert-False ($restoredNestedTheme.Contains('ui = "Microsoft YaHei UI"')) 'restore removes an added UI font absent from the backup'
+
+$parentOnlyThemeConfig = @'
+[desktop]
+appearanceTheme = "system"
+
+[desktop.appearanceLightChromeTheme]
+accent = "#0169cc"
+'@
+$parentOnlyThemed = Set-DreamSkinDesktopConfig -Content $parentOnlyThemeConfig
+$parentOnlyRestored = Restore-DreamSkinDesktopConfig -CurrentContent $parentOnlyThemed -BackupContent $parentOnlyThemeConfig
+Assert-False ($parentOnlyRestored.Contains('[desktop.appearanceLightChromeTheme.fonts]')) `
+  'restore removes an empty nested font table absent from the backup'
+Assert-False ($parentOnlyRestored.Contains('[desktop.appearanceLightChromeTheme.semanticColors]')) `
+  'restore removes an empty nested semantic color table absent from the backup'
+
+$formattedNestedConfig = @'
+[desktop]
+  appearanceTheme = "system"
+
+  [desktop.appearanceLightChromeTheme] # keep this user comment
+  accent = "#0169cc"
+  contrast = 45
+'@
+$formattedNestedResult = Set-DreamSkinDesktopConfig -Content $formattedNestedConfig
+Assert-Equal 1 ([regex]::Matches($formattedNestedResult, '(?m)^\s*\[desktop\.appearanceLightChromeTheme\]')).Count `
+  'an indented and commented table header is reused instead of duplicated'
+Assert-Equal 1 ([regex]::Matches($formattedNestedResult, '(?m)^\s*accent\s*=')).Count `
+  'an indented theme key is updated instead of duplicated'
+Assert-True ($formattedNestedResult.Contains('accent = "#B65CFF"')) 'formatted nested theme receives the new accent'
+Assert-Equal $formattedNestedResult (Set-DreamSkinDesktopConfig -Content $formattedNestedResult) `
+  'theme transformation remains idempotent with indented keys and commented headers'
+
 $packageRoot = 'C:\Program Files\WindowsApps\OpenAI.Codex_26.707.9981.0_x64__2p2nqsd0c76g0'
 $officialExe = Join-Path $packageRoot 'app\ChatGPT.exe'
 Assert-Equal $packageRoot (Get-CodexPackageRootFromExecutablePath -ExecutablePath $officialExe) 'official package path is parsed'
@@ -30,6 +99,17 @@ Assert-Equal '26.707.9981.0' (Get-CodexPackageVersionFromRoot -PackageRoot $pack
 Assert-Equal $null (Get-CodexPackageRootFromExecutablePath -ExecutablePath 'C:\Temp\ChatGPT.exe') 'arbitrary ChatGPT.exe is rejected'
 $forgedExe = 'C:\Temp\WindowsApps\OpenAI.Codex_26.707.9981.0_x64__2p2nqsd0c76g0\app\ChatGPT.exe'
 Assert-Equal $null (Get-CodexPackageRootFromExecutablePath -ExecutablePath $forgedExe) 'lookalike WindowsApps directory outside Program Files is rejected'
+Assert-Equal 'OpenAI.Codex_2p2nqsd0c76g0!App' `
+  (Format-CodexApplicationUserModelId -PackageName 'OpenAI.Codex' -ApplicationId 'App') `
+  'Codex AUMID is built from the manifest identity and publisher ID'
+$launchArguments = Format-CodexLaunchArguments -Port 9335 -ProfilePath 'C:\Users\Demo User\Preview Profile'
+Assert-Equal '--remote-debugging-address=127.0.0.1 --remote-debugging-port=9335 --user-data-dir="C:\Users\Demo User\Preview Profile"' `
+  $launchArguments `
+  'packaged activation arguments preserve a profile path containing spaces'
+$trailingSlashArguments = Format-CodexLaunchArguments -Port 9335 -ProfilePath 'C:\Preview\'
+Assert-Equal '--remote-debugging-address=127.0.0.1 --remote-debugging-port=9335 --user-data-dir="C:\Preview\\"' `
+  $trailingSlashArguments `
+  'packaged activation doubles trailing backslashes before a closing quote'
 
 $selected = Resolve-CodexExecutableCandidate `
   -PackageCandidates @('C:\missing\ChatGPT.exe') `
@@ -93,7 +173,12 @@ try {
 }
 
 $startSource = Get-Content -LiteralPath (Join-Path $Root 'windows\scripts\start-dream-skin.ps1') -Raw
-Assert-True ($startSource.Contains('--remote-debugging-address=127.0.0.1')) 'launcher explicitly binds CDP to IPv4 loopback'
+$commonSource = Get-Content -LiteralPath $Common -Raw
+$injectorSource = Get-Content -LiteralPath $Injector -Raw
+Assert-True ($commonSource.Contains('--remote-debugging-address=127.0.0.1')) 'launcher explicitly binds CDP to IPv4 loopback'
+Assert-True ($startSource.Contains('Invoke-CodexApplicationActivation')) 'launcher uses packaged application activation'
+Assert-False ($startSource.Contains('Start-Process -FilePath $codexRuntime.Executable')) 'launcher never directly executes the protected WindowsApps binary'
+Assert-False ($injectorSource.Contains('innerText')) 'diagnostic probe never serializes renderer text content'
 
 $node = (Get-Command node -ErrorAction Stop).Source
 $payloadJson = & $node $Injector --check-payload
